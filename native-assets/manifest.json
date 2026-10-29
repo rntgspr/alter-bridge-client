@@ -1,0 +1,14 @@
+{
+  "version": "0.8.0",
+  "files": {
+    "native-assets/claude-hooks.json": "4688256201729ed7a5348d8477725b4a159abcf5218649dd4bcc6970bb539105",
+    "native-assets/codex-hooks.json": "c5e89ef8da4d255663efe3a971f607493f494af6a4e4d59b20de4a57ab83d2a2",
+    "skills/abg-connect-context/SKILL.md": "8a24a04dd6956ab96929ae46587de5cfe1b7b02dc8579114d661ee8c4727422d",
+    "skills/abg-connect-device/SKILL.md": "fafec93001775afcf98d5351239136ee73ee27dce15f700175f066a93f2b8c6d",
+    "skills/abg-disconnect-context/SKILL.md": "1e7351f6e0adebb7caa3b80d80a0ba39cbf9a6f671cc7b9c53a7c5f3799ca00c",
+    "skills/abg-disconnect-device/SKILL.md": "d0dc244c57581bb431c17d63da77a23eedfaf4dca268a2c48ce5a2b74ad0befe",
+    "skills/abg-doctor/SKILL.md": "793ad2416ce3777e4ea1d73f2b9e2771ef270ffcd8dc267e2f830d082b44ae36",
+    "skills/abg-who/SKILL.md": "58d5318a692adb3bf87d2b67b7e62826442b4af14650c516733262c2328818f9",
+    "skills/abg/SKILL.md": "511927d4b27a6e3f88d35c4a762e21b56d417b6b7560e40ea4d6035f92e83929"
+  }
+}

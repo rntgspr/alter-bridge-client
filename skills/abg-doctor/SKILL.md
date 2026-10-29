@@ -1,0 +1,21 @@
+---
+name: abg-doctor
+description: Diagnose alter-bridge connectivity and native integration step by step, without changing device or chat state. Use when a user asks why the bridge, daemon, MCP tools, or current chat is not connected.
+---
+
+# Connection diagnosis
+
+First explain the user's two separate choices: operating a local server through Docker/Compose, or connecting this device to an existing server by URL. That existing server may be local, on another computer on the LAN, or online. Installing the CLI or connecting a device does not start a server. A remote-server client does not need Docker or a local server. If the intended role is unknown, report it as unknown rather than assume a local server must be started. Refer local operators to their deployment's Compose instructions; refer clients to `abg connect device <url> --hexid <code>`. Show guidance only: diagnosis never starts a server or connects a device. An unreachable URL alone does not establish whether a server is stopped, the address is wrong, or network/tunnel access failed.
+
+Run the installed `alter-bridge doctor` and preserve its independent `ok`, `attention`, `unknown`, and `unchecked` findings. Use its binary/setup version and installed asset findings, plus command availability, to recognize an older CLI; this skill has no independent version number. Never treat repository source as the installed runtime. If the command is absent, report that prerequisite as attention and continue with safely observable native-tool facts.
+
+Follow these dependency steps, retaining independent findings even when another step is blocked:
+
+1. Read the doctor's local findings for private config validity, masked device credential presence, installed skill and hook hashes, native MCP profile, daemon job/lock, and setup version. Do not read or display private credential values, bearer tokens, disconnect keys, or the output of `alter-bridge mcp headers`.
+2. Read its bounded broker health/readiness, device status, accepted WebSocket, and owned native binding findings. For a separate read-only shared directory check, use installed `alter-bridge who` only when the CLI offers it and broker/device prerequisites are ready. A 404 from its `GET /device/directory` route can indicate an older server; a reachable health route alone does not prove compatibility. Mark server route compatibility unknown or attention until a supported route succeeds. If `who` is unavailable, report version skew or an unchecked route; do not issue custom authenticated requests.
+3. Check current-chat MCP tool exposure from tools **actually available in this conversation**. An installed profile, enabled UI connection, or doctor's local setup finding does not prove model-visible tools. If the connected alter-bridge `who` tool is exposed, a read-only call may verify directory access and trusted current actor participation. Otherwise mark live MCP and participation unchecked, and give the specific provider reopen/profile or connection step. Do not use CLI `who` as proof that this chat has an MCP tool.
+4. Compare the current actor only with an exact trusted native identity and a returned directory entry. Do not infer participation from a title, cwd, PID, name, or ID prefix. If the exact actor is unavailable, report participation unchecked and explain what trusted identity is needed.
+
+Report the intended role and configured target first, then each step as `ok`, `attention`, `unknown`, or `unchecked`, with evidence and one concrete next action for non-ok items. Keep server operation, client connection, device authority, accepted daemon WS, native setup, live tool exposure, and current actor participation separate. A successful doctor's exit code covers only its observed checks; model processing and native execution stay unchecked without direct evidence.
+
+The diagnostic is read-only. Do not pair, activate, join, leave, restart, initialize MCP, rewrite config, send messages, or retrieve inbox bodies (which automatically commits consumption). A delivery/read receipt is a separate server fact and does not prove model processing. Stop dependent probes when prerequisites fail; do not hide independent observations. Use the doctor's next actions for repair guidance.

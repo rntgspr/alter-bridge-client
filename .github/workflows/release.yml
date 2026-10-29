@@ -1,0 +1,36 @@
+# Tagged publication builds and publishes the standalone macOS client package.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  client-artifact:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+
+      - name: Verify release tag
+        run: |
+          version="$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\([^"]*\)"/\1/p' Cargo.toml)"
+          test "$TAG" = "v$version"
+
+      - name: Add macOS targets
+        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Build
+        run: |
+          scripts/client/package.sh "$TAG"
+          stage="$(mktemp -d)"
+          unzip -q "dist/alter-bridge-$TAG.zip" -d "$stage"
+          (cd "$stage/alter-bridge-$TAG" && shasum -a 256 -c SHA256SUMS)
+          rm -rf "$stage"
+
+      - name: Publish release
+        run: gh release create "$TAG" "dist/alter-bridge-$TAG.zip" "dist/alter-bridge-$TAG.zip.sha256" --title "$TAG" --generate-notes

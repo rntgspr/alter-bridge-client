@@ -1,0 +1,9 @@
+[package]
+name = "alter-bridge-protocol"
+description = "Shared alter-bridge message, storage, and notification types."
+version.workspace = true
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+serde.workspace = true

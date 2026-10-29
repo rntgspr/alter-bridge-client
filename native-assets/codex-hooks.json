@@ -1,0 +1,10 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {"hooks": [{"type": "command", "command": "${ALTER_BRIDGE_BIN} hook codex --register-only", "timeout": 10}]}
+    ],
+    "UserPromptSubmit": [
+      {"hooks": [{"type": "command", "command": "${ALTER_BRIDGE_BIN} hook codex", "timeout": 3}]}
+    ]
+  }
+}
