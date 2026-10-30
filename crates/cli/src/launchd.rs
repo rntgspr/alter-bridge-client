@@ -11,6 +11,9 @@ use crate::Exit;
 /// launchd label of the user daemon.
 pub(crate) const LABEL: &str = "com.rntgspr.alter-bridge";
 
+/// launchd label of the daemon when it was registered by the Homebrew formula's `brew services`.
+const HOMEBREW_LABEL: &str = "homebrew.mxcl.alter-bridge";
+
 /// Executable search path given to the daemon, which launchd starts without a login shell.
 const SEARCH_PATH: &str = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 
@@ -163,10 +166,27 @@ fn provider_roots() -> Result<Vec<(&'static str, String)>, Exit> {
     Ok(roots)
 }
 
-/// Returns the executable the LaunchAgent starts: the stable current path when it is this binary.
+/// Refuses to register while the Homebrew service job still exists, so two jobs never supervise one daemon.
+fn require_no_homebrew_service(home: &Path) -> Result<(), Exit> {
+    let legacy = home.join(format!("Library/LaunchAgents/{HOMEBREW_LABEL}.plist"));
+    let loaded = launchctl(&["print", &format!("{}/{HOMEBREW_LABEL}", domain())])?.0;
+
+    if loaded || legacy.exists() {
+        return Err(Exit::Failure(format!(
+            "daemon: Homebrew service {HOMEBREW_LABEL} is still registered; run `brew services stop alter-bridge` first"
+        )));
+    }
+
+    Ok(())
+}
+
+/// Returns the executable the LaunchAgent starts: the stable current path when it is this binary,
+/// otherwise the invoked path, which keeps Homebrew's bin symlink (stable across upgrades) instead of its Cellar target.
 fn launch_binary(home: &Path) -> Result<PathBuf, Exit> {
-    let executable = std::env::current_exe()
-        .and_then(|path| path.canonicalize())
+    let invoked = std::env::current_exe()
+        .map_err(|error| Exit::Failure(format!("daemon: cannot resolve executable: {error}")))?;
+    let executable = invoked
+        .canonicalize()
         .map_err(|error| Exit::Failure(format!("daemon: cannot resolve executable: {error}")))?;
     let stable = home.join(".local/share/alter-bridge/current/bin/alter-bridge");
 
@@ -175,6 +195,8 @@ fn launch_binary(home: &Path) -> Result<PathBuf, Exit> {
         .is_ok_and(|resolved| resolved == executable)
     {
         Ok(stable)
+    } else if invoked.is_absolute() {
+        Ok(invoked)
     } else {
         Ok(executable)
     }
@@ -230,6 +252,7 @@ pub(crate) fn install(home: &Path) -> Result<(), Exit> {
     ensure_directory(&logs)?;
     require_owned(&log_path(home), false)?;
     require_managed_definition(&plist)?;
+    require_no_homebrew_service(home)?;
 
     let contents = render(home, &launch_binary(home)?)?;
     let temporary = agents.join(format!(".{LABEL}.{}.tmp", std::process::id()));
