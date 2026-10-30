@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 const USAGE: &str = "usage: alter-bridge <command> [args]
+  alter-bridge --version  print the client package version
 commands:
   daemon  manage device WebSocket (run | status | stop | restart | install | uninstall)
   connect device [url] [--hexid <six lowercase hex>] [--id <device>]
@@ -58,6 +59,16 @@ fn dispatch(args: &[String]) -> Result<(), Exit> {
     let Some((command, rest)) = args.split_first() else {
         return Err(Exit::Usage(USAGE.to_string()));
     };
+
+    if command == "--version" {
+        if !rest.is_empty() {
+            return Err(Exit::Usage(USAGE.to_string()));
+        }
+
+        println!("alter-bridge {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     let home = home()?;
 
     match command.as_str() {
