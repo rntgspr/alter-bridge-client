@@ -638,7 +638,7 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
             "run alter-bridge config opencode if you use OpenCode",
         );
     }
-    let plist = home.join("Library/LaunchAgents/com.rntgspr.alter-bridge.plist");
+    let plist = crate::launchd::plist_path(home);
     match read_file(&plist) {
         Ok(Some(bytes))
             if std::str::from_utf8(&bytes).ok().is_some_and(|text| {
@@ -659,7 +659,7 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
                 "attention",
                 "launchd definition",
                 "missing, unreadable, or unexpected",
-                "run scripts/client/install-daemon.sh with the absolute installed binary path",
+                "alter-bridge daemon install",
             );
         }
     }

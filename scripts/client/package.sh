@@ -37,7 +37,6 @@ codesign --verify --strict "$package/bin/alter-bridge"
 
 cp INSTALL-OFFLINE.md "$package/"
 cp scripts/client/install.sh "$package/scripts/client/"
-cp scripts/client/install-daemon.sh scripts/client/ensure-daemon.sh scripts/client/uninstall-daemon.sh "$package/scripts/client/"
 cp native-assets/manifest.json "$package/native-assets/"
 while IFS= read -r path; do
   mkdir -p "$package/$(dirname "$path")"

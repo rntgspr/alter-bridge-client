@@ -16,14 +16,12 @@ case "$version" in *[!0-9A-Za-z.-]*|'') fail 'invalid package version' ;; esac
 [ "$(basename "$root")" = "alter-bridge-v$version" ] || fail 'package folder and VERSION do not match'
 [ -f "$root/SHA256SUMS" ] || fail 'SHA256SUMS is missing'
 [ -f "$root/bin/alter-bridge" ] && [ -x "$root/bin/alter-bridge" ] || fail 'universal executable is missing'
-[ -f "$root/scripts/client/install-daemon.sh" ] || fail 'daemon installer is missing'
 [ -f "$root/native-assets/manifest.json" ] || fail 'native assets are missing'
 [ -z "$(find "$root" ! -type f ! -type d -print -quit)" ] || fail 'package contains a symlink or special file'
 [ "$(plutil -extract version raw -o - "$root/native-assets/manifest.json" 2>/dev/null)" = "$version" ] || fail 'native asset manifest version differs from package'
-[ "$(find "$root" -type f | wc -l | tr -d ' ')" = 18 ] || fail 'package file set is not the expected release'
-[ "$(wc -l < "$root/SHA256SUMS" | tr -d ' ')" = 17 ] || fail 'checksum file set is incomplete'
+[ "$(find "$root" -type f | wc -l | tr -d ' ')" = 15 ] || fail 'package file set is not the expected release'
+[ "$(wc -l < "$root/SHA256SUMS" | tr -d ' ')" = 14 ] || fail 'checksum file set is incomplete'
 for path in VERSION bin/alter-bridge scripts/client/install.sh INSTALL-OFFLINE.md \
-  scripts/client/install-daemon.sh scripts/client/ensure-daemon.sh scripts/client/uninstall-daemon.sh \
   native-assets/manifest.json native-assets/claude-hooks.json native-assets/codex-hooks.json \
   skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md; do
   [ -f "$root/$path" ] || fail "package asset is missing: $path"
@@ -58,10 +56,9 @@ reuse=false
 if [ -e "$target" ] || [ -L "$target" ]; then
   [ ! -L "$target" ] && [ -d "$target" ] && [ -f "$target/SHA256SUMS" ] || fail "unrelated versioned target: $target"
   [ -z "$(find "$target" ! -type f ! -type d -print -quit)" ] || fail "versioned target contains a symlink or special file: $target"
-  [ "$(find "$target" -type f | wc -l | tr -d ' ')" = 18 ] || fail "versioned target contains unrelated files: $target"
+  [ "$(find "$target" -type f | wc -l | tr -d ' ')" = 15 ] || fail "versioned target contains unrelated files: $target"
   cmp -s "$root/SHA256SUMS" "$target/SHA256SUMS" || fail "versioned target differs from package: $target"
   for path in VERSION bin/alter-bridge scripts/client/install.sh INSTALL-OFFLINE.md \
-    scripts/client/install-daemon.sh scripts/client/ensure-daemon.sh scripts/client/uninstall-daemon.sh \
     native-assets/manifest.json native-assets/claude-hooks.json native-assets/codex-hooks.json \
     skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md; do
     cmp -s "$root/$path" "$target/$path" || fail "versioned target has changed: $target/$path"
@@ -109,7 +106,6 @@ if [ "$reuse" = false ]; then
   trap 'rm -rf "$stage"' EXIT HUP INT TERM
   cp -R "$root/." "$stage/" || fail 'could not copy package into versioned staging directory'
   for path in VERSION bin/alter-bridge scripts/client/install.sh INSTALL-OFFLINE.md \
-    scripts/client/install-daemon.sh scripts/client/ensure-daemon.sh scripts/client/uninstall-daemon.sh \
     native-assets/manifest.json native-assets/claude-hooks.json native-assets/codex-hooks.json \
     skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md SHA256SUMS; do
     cmp -s "$root/$path" "$stage/$path" || fail "staged package differs: $path"
@@ -131,5 +127,5 @@ for name in alter-bridge abg; do
   ln -s "$current/bin/alter-bridge" "$next"
   mv -fh "$next" "$link"
 done
-sh "$current/scripts/client/install-daemon.sh" "$current/bin/alter-bridge" || fail 'payload installed, but LaunchAgent installation failed; inspect the daemon path'
+"$current/bin/alter-bridge" daemon install >/dev/null || fail 'payload installed, but LaunchAgent installation failed; inspect the daemon path'
 printf 'Installed alter-bridge v%s. Connect a device, then run abg config codex|claude to set up a provider.\n' "$version"

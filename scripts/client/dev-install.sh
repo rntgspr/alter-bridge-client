@@ -97,13 +97,12 @@ binary="${CARGO_TARGET_DIR:-target}/debug/alter-bridge"
 step=assets
 mkdir -p "$store/versions" "$bin_dir" "$HOME/.config"
 stage=$(mktemp -d "$store/versions/.dev.XXXXXX")
-mkdir -p "$stage/bin" "$stage/native-assets" "$stage/scripts/client"
+mkdir -p "$stage/bin" "$stage/native-assets"
 cp "$binary" "$stage/bin/alter-bridge"
 codesign --force --sign - --timestamp=none "$stage/bin/alter-bridge"
 codesign --verify --strict "$stage/bin/alter-bridge"
 cp -R skills "$stage/skills"
 cp native-assets/claude-hooks.json native-assets/codex-hooks.json "$stage/native-assets/"
-cp scripts/client/install-daemon.sh "$stage/scripts/client/"
 sh scripts/client/manifest.sh > "$stage/native-assets/manifest.json"
 while IFS=$'\t' read -r path expected; do
   actual=$(shasum -a 256 "$stage/$path")

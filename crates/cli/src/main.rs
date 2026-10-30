@@ -7,6 +7,7 @@ mod connect;
 mod daemon;
 mod doctor;
 mod hook;
+mod launchd;
 mod mcp;
 mod notify;
 mod opencode;
@@ -19,7 +20,7 @@ use std::process::ExitCode;
 
 const USAGE: &str = "usage: alter-bridge <command> [args]
 commands:
-  daemon  manage device WebSocket (run | status | stop | restart)
+  daemon  manage device WebSocket (run | status | stop | restart | install | uninstall)
   connect device [url] [--hexid <six lowercase hex>] [--id <device>]
   connect context --provider codex|claude|opencode --id <native-id> --name <friendly-name> [--tools-available] [--status]
   disconnect device --hexid <six lowercase hex> --id <saved-device>

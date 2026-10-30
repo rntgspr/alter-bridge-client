@@ -6,7 +6,6 @@ use std::io::{ErrorKind, Read, Seek, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::os::unix::fs::{DirBuilderExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
@@ -17,10 +16,7 @@ use tungstenite::stream::MaybeTlsStream;
 use tungstenite::{Message, WebSocket, client_tls_with_config};
 
 use crate::config::{self, Config};
-use crate::{Exit, api::Client, notify, session};
-
-/// launchd label of the user daemon, shared with `scripts/client/install-daemon.sh`.
-const LAUNCHD_LABEL: &str = "com.rntgspr.alter-bridge";
+use crate::{Exit, api::Client, launchd, notify, session};
 
 /// Initial ceiling for the randomized reconnect delay.
 const BACKOFF_MIN: Duration = Duration::from_secs(1);
@@ -770,11 +766,7 @@ fn status(home: &Path) -> Result<(), Exit> {
 
 /// Ends launchd supervision first, so nothing restarts the daemon, then stops the process.
 fn stop(home: &Path) -> Result<(), Exit> {
-    // SAFETY: getuid has no preconditions and cannot fail.
-    let uid = unsafe { libc::getuid() };
-    let _ = Command::new("launchctl")
-        .args(["bootout", &format!("gui/{uid}/{LAUNCHD_LABEL}")])
-        .output();
+    launchd::unload()?;
 
     if let Some((pid, _)) = running_daemon(home)
         && pid > 1
@@ -799,34 +791,13 @@ fn stop(home: &Path) -> Result<(), Exit> {
     Ok(())
 }
 
-/// Starts the installed launchd job and waits briefly for an accepted device socket.
+/// Reinstalls and reloads the launchd job, then waits briefly for an accepted device socket.
 pub(crate) fn restart(home: &Path) -> Result<(), Exit> {
     config::load(home).map_err(Exit::Failure)?;
-    let executable = std::env::current_exe()
-        .and_then(|path| path.canonicalize())
-        .map_err(|error| Exit::Failure(error.to_string()))?;
-    let helper = executable.ancestors().skip(1).take(4)
-        .map(|root| root.join("scripts/client/install-daemon.sh"))
-        .chain(executable.parent().into_iter().map(|root| root.join("../share/alter-bridge/daemon/install.sh")))
-        .find(|path| path.is_file()).ok_or_else(|| Exit::Failure(
-        "daemon installer unavailable beside this executable; run scripts/client/install-daemon.sh with the absolute binary path".into()))?;
-    let stable = home.join(".local/share/alter-bridge/current/bin/alter-bridge");
-    let matches_stable = stable
-        .canonicalize()
-        .ok()
-        .zip(executable.canonicalize().ok())
-        .is_some_and(|(stable, running)| stable == running);
-    let launch_binary = if matches_stable { stable } else { executable };
 
     stop(home)?;
-    let result = Command::new("sh")
-        .arg(helper)
-        .arg(launch_binary)
-        .status()
-        .map_err(|error| Exit::Failure(format!("daemon installer failed to start: {error}")))?;
-    if !result.success() {
-        return Err(Exit::Failure(format!("daemon installer exited {result}")));
-    }
+    launchd::install(home)?;
+
     let deadline = Instant::now() + STOP_TIMEOUT;
     while Instant::now() < deadline {
         if running_daemon(home).is_some_and(|(_, state)| state == "connected") {
@@ -845,8 +816,10 @@ pub fn run(args: &[String], home: &Path) -> Result<(), Exit> {
         [mode] if mode == "status" => status(home),
         [mode] if mode == "stop" => stop(home),
         [mode] if mode == "restart" => restart(home),
+        [mode] if mode == "install" => launchd::install(home).map(|()| println!("installed")),
+        [mode] if mode == "uninstall" => launchd::uninstall(home).map(|()| println!("uninstalled")),
         _ => Err(Exit::Usage(
-            "usage: alter-bridge daemon run|status|stop|restart\n".to_string(),
+            "usage: alter-bridge daemon run|status|stop|restart|install|uninstall\n".to_string(),
         )),
     }
 }

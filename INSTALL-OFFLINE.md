@@ -5,7 +5,7 @@ The incompatible identity contract has not been published. The existing `v0.7.5`
 the native manifest and cannot supply the new online assets; a later explicit
 version bump and matching release are required.
 
-The client ZIP contains a universal `alter-bridge` executable, daemon files,
+The client ZIP contains a universal `alter-bridge` executable, the package installer,
 native provider assets and `SHA256SUMS`. The server is distributed as a Docker
 image; Compose/Caddy deployment files live in the source checkout. A notebook
 client needs no local Docker.
