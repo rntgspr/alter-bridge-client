@@ -56,16 +56,16 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
     let actor = Identity {
         id: input.session_id,
     };
-    print_context(
-        expected_event,
-        &format!(
-            "alter-bridge trusted current actor: {}",
-            serde_json::to_string(&actor).expect("identity serializes")
-        ),
+    let mut context = format!(
+        "alter-bridge trusted current actor: {}",
+        serde_json::to_string(&actor).expect("identity serializes")
     );
+
     if register_only {
+        print_context(expected_event, &context);
         return Ok(());
     }
+
     let started = Instant::now();
     let outcome = (|| -> Result<Option<String>, String> {
         let saved = config::load(home)?;
@@ -95,8 +95,11 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
     })();
 
     if let Ok(Some(notice)) = outcome.as_ref() {
-        print_context(expected_event, notice);
+        context.push('\n');
+        context.push_str(notice);
     }
+
+    print_context(expected_event, &context);
 
     Ok(())
 }
