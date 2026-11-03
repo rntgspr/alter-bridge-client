@@ -24,7 +24,7 @@ commands:
   daemon  manage device WebSocket (run | status | stop | restart | install | uninstall)
   connect device [url] [--hexid <six lowercase hex>] [--id <device>]
   connect context --provider codex|claude|opencode --id <native-id> --name <friendly-name> [--tools-available] [--status]
-  disconnect device --hexid <six lowercase hex> --id <saved-device>
+  disconnect device --hexid <six lowercase hex> [--id <saved-device>]
   disconnect context --id <native-id>
   reconnect context --provider codex|claude|opencode --previous-id <old-id> --id <new-native-id> [--name <friendly-name>] [--tools-available]
   config codex|claude [--assets /absolute/package-root]  preview and install native MCP, hooks, and skill

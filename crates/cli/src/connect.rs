@@ -7,7 +7,7 @@ use alter_bridge_protocol::{DeviceConnectRequest, DeviceDisconnectRequest, Devic
 use crate::{Exit, api::Client, config, daemon, setup};
 
 const CONNECT_USAGE: &str = "usage: alter-bridge connect device [url] [--hexid <six lowercase hex>] [--id <device>]\nSaved credentials are reused before issuance. Missing URL/hexid requires the device skill.\n";
-const DISCONNECT_USAGE: &str = "usage: alter-bridge disconnect device --hexid <six lowercase hex> --id <saved-device>\nThe private disconnect key is read from the saved configuration.\n";
+const DISCONNECT_USAGE: &str = "usage: alter-bridge disconnect device --hexid <six lowercase hex> [--id <saved-device>]\n--id defaults to the saved device ID. The private disconnect key is read from the saved configuration.\n";
 
 /// Parses one optional URL and nonduplicated named arguments without reflecting private input.
 fn arguments(
@@ -52,7 +52,7 @@ fn arguments(
             "device ID must be a lowercase slug of 1 to 128 bytes\n".into(),
         ));
     }
-    if disconnect && (code.is_none() || id.is_none()) {
+    if disconnect && code.is_none() {
         return Err(Exit::Usage(usage.into()));
     }
 
@@ -489,7 +489,7 @@ pub(crate) fn disconnect(args: &[String], home: &Path) -> Result<(), Exit> {
     let (_, code, id) = arguments(args, true)?;
     let mut transaction = config::Transaction::open(home).map_err(Exit::Failure)?;
     let saved = transaction.file.connected().map_err(Exit::Failure)?;
-    if id != Some(saved.device_id.as_str()) {
+    if id.is_some_and(|id| id != saved.device_id) {
         return Err(Exit::Failure(
             "disconnect: --id must match the saved device; credentials and daemon were not changed"
                 .into(),
