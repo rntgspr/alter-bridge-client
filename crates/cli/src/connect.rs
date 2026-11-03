@@ -350,6 +350,136 @@ pub(crate) fn context(args: &[String], home: &Path, leave: bool) -> Result<(), E
     Ok(())
 }
 
+/// Moves one owned binding to a new native ID by leaving the old one and then joining the new one.
+pub(crate) fn reconnect(args: &[String], home: &Path) -> Result<(), Exit> {
+    let usage = "usage: abg reconnect context --provider codex|claude|opencode --previous-id <old-native-id> --id <new-trusted-native-id> [--name <friendly-name>] [--tools-available]\nMessages, rooms and cursors stay with the old ID; nothing is migrated.\n";
+    if matches!(args, [flag] if flag == "--help" || flag == "-h") {
+        print!("{usage}");
+        return Ok(());
+    }
+    let (mut previous, mut id, mut name, mut provider, mut tools) = (None, None, None, None, false);
+    let mut values = args.iter();
+    while let Some(value) = values.next() {
+        match value.as_str() {
+            "--previous-id" if previous.is_none() => previous = values.next().map(String::as_str),
+            "--id" if id.is_none() => id = values.next().map(String::as_str),
+            "--name" if name.is_none() => name = values.next().map(String::as_str),
+            "--provider" if provider.is_none() => provider = values.next().map(String::as_str),
+            "--tools-available" if !tools => tools = true,
+            _ => return Err(Exit::Usage(usage.into())),
+        }
+    }
+    let valid = |id: &&str| {
+        !id.is_empty() && id.len() <= limits::IDENTITY_ID_BYTES && !id.chars().any(char::is_control)
+    };
+    let (Some(previous), Some(id)) = (previous.filter(valid), id.filter(valid)) else {
+        return Err(Exit::Usage(usage.into()));
+    };
+    if previous == id {
+        return Err(Exit::Failure(
+            "reconnect: --previous-id and --id must differ".into(),
+        ));
+    }
+    let native = match provider {
+        Some("opencode") => crate::session::Provider::OpenCode,
+        Some("codex") => crate::session::Provider::Codex,
+        Some("claude") => crate::session::Provider::Claude,
+        _ => return Err(Exit::Usage(usage.into())),
+    };
+    if !crate::session::is_full_id(native, id) {
+        return Err(Exit::Failure(
+            "reconnect: --id does not have the native session form".into(),
+        ));
+    }
+    let preferences = config::preferences(home).map_err(Exit::Failure)?;
+    let Ok(saved) = preferences.connected() else {
+        println!(
+            "{}",
+            serde_json::json!({"outcome":"device_required", "next":"invoke abg-connect-device"})
+        );
+        return Ok(());
+    };
+    let client = Client::new(&saved.url);
+    let status = client
+        .status(&saved.token)
+        .map_err(|error| Exit::Failure(error.public_message()))?;
+    if status.state != DeviceState::Active || !status.connected {
+        println!(
+            "{}",
+            serde_json::json!({"outcome":"device_pending", "device_connected":false, "next":"invoke abg-connect-device once, then resume"})
+        );
+        return Ok(());
+    }
+    if !tools || setup::verify_managed_entry(provider.expect("provider checked"), home).is_err() {
+        println!(
+            "{}",
+            serde_json::json!({"outcome":"pending", "mcp_tools_available":tools, "next":"confirm native configuration and visible MCP tools, then pass --tools-available"})
+        );
+        return Ok(());
+    }
+    let sessions = client
+        .sessions(&saved.token)
+        .map_err(|error| Exit::Failure(error.public_message()))?;
+    let Some(old) = sessions.iter().find(|binding| binding.id == previous) else {
+        return Err(Exit::Failure(
+            "reconnect: --previous-id is not an owned binding of this device; nothing changed"
+                .into(),
+        ));
+    };
+    let name = name
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or(&old.name)
+        .to_string();
+
+    let left = client
+        .leave_session(
+            &saved.token,
+            &alter_bridge_protocol::Identity {
+                id: previous.into(),
+            },
+        )
+        .map_err(|error| {
+            Exit::Failure(format!(
+                "reconnect: leave failed: {}; old binding kept, new not joined",
+                error.public_message()
+            ))
+        })?;
+
+    let retry = format!(
+        "abg connect context --provider {} --id {id} --name {name} --tools-available",
+        provider.expect("provider checked")
+    );
+    let note = "messages, rooms and cursors stay with the old ID; nothing was migrated";
+    match client.register_session(
+        &saved.token,
+        &alter_bridge_protocol::DeviceSessionRequest {
+            id: id.into(),
+            name: name.clone(),
+        },
+    ) {
+        Ok(response) if response.actor.id == id && response.device_id == saved.device_id => {
+            println!(
+                "{}",
+                serde_json::json!({"outcome":"reconnected", "name":name, "previous_id":previous, "id":id, "leave":left, "join":"joined", "note":note})
+            );
+            Ok(())
+        }
+        result => {
+            let detail = match result {
+                Err(error) => error.public_message(),
+                Ok(_) => "broker returned a different context identity".into(),
+            };
+            println!(
+                "{}",
+                serde_json::json!({"outcome":"old_left_new_not_joined", "name":name, "previous_id":previous, "id":id, "leave":left, "join":detail, "retry":retry, "note":note})
+            );
+            Err(Exit::Failure(format!(
+                "reconnect: old left, new not joined: {detail}; retry with: {retry}"
+            )))
+        }
+    }
+}
+
 /// Sends generation-specific revocation before clearing credentials and stopping the local daemon.
 pub(crate) fn disconnect(args: &[String], home: &Path) -> Result<(), Exit> {
     if matches!(args, [flag] if flag == "--help" || flag == "-h") {

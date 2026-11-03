@@ -26,6 +26,7 @@ commands:
   connect context --provider codex|claude|opencode --id <native-id> --name <friendly-name> [--tools-available] [--status]
   disconnect device --hexid <six lowercase hex> --id <saved-device>
   disconnect context --id <native-id>
+  reconnect context --provider codex|claude|opencode --previous-id <old-id> --id <new-native-id> [--name <friendly-name>] [--tools-available]
   config codex|claude [--assets /absolute/package-root]  preview and install native MCP, hooks, and skill
   config opencode  preview and record daemon-managed OpenCode integration
   doctor  inspect local setup and nonactivating broker state (0 observed healthy, 1 attention, 2 invocation)
@@ -81,6 +82,10 @@ fn dispatch(args: &[String]) -> Result<(), Exit> {
         "disconnect" => match rest.split_first() {
             Some((mode, args)) if mode == "device" => connect::disconnect(args, &home),
             Some((mode, args)) if mode == "context" => connect::context(args, &home, true),
+            _ => Err(Exit::Usage(USAGE.into())),
+        },
+        "reconnect" => match rest.split_first() {
+            Some((mode, args)) if mode == "context" => connect::reconnect(args, &home),
             _ => Err(Exit::Usage(USAGE.into())),
         },
         "config" => setup::run(rest, &home),

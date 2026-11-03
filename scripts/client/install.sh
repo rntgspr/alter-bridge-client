@@ -23,7 +23,7 @@ case "$version" in *[!0-9A-Za-z.-]*|'') fail 'invalid package version' ;; esac
 [ "$(wc -l < "$root/SHA256SUMS" | tr -d ' ')" = 15 ] || fail 'checksum file set is incomplete'
 for path in VERSION bin/alter-bridge scripts/client/install.sh INSTALL-OFFLINE.md \
   native-assets/manifest.json native-assets/claude-hooks.json native-assets/codex-hooks.json \
-  skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md skills/abg-handshake/SKILL.md; do
+  skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-reconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md skills/abg-handshake/SKILL.md; do
   [ -f "$root/$path" ] || fail "package asset is missing: $path"
   expected=$(awk -v path="$path" '$2 == path { print $1 }' "$root/SHA256SUMS")
   [ "${#expected}" -eq 64 ] || fail "checksum is missing or duplicated: $path"
@@ -60,7 +60,7 @@ if [ -e "$target" ] || [ -L "$target" ]; then
   cmp -s "$root/SHA256SUMS" "$target/SHA256SUMS" || fail "versioned target differs from package: $target"
   for path in VERSION bin/alter-bridge scripts/client/install.sh INSTALL-OFFLINE.md \
     native-assets/manifest.json native-assets/claude-hooks.json native-assets/codex-hooks.json \
-    skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md skills/abg-handshake/SKILL.md; do
+    skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-reconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md skills/abg-handshake/SKILL.md; do
     cmp -s "$root/$path" "$target/$path" || fail "versioned target has changed: $target/$path"
   done
   reuse=true
@@ -107,7 +107,7 @@ if [ "$reuse" = false ]; then
   cp -R "$root/." "$stage/" || fail 'could not copy package into versioned staging directory'
   for path in VERSION bin/alter-bridge scripts/client/install.sh INSTALL-OFFLINE.md \
     native-assets/manifest.json native-assets/claude-hooks.json native-assets/codex-hooks.json \
-    skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md skills/abg-handshake/SKILL.md SHA256SUMS; do
+    skills/abg/SKILL.md skills/abg-who/SKILL.md skills/abg-doctor/SKILL.md skills/abg-connect-context/SKILL.md skills/abg-connect-device/SKILL.md skills/abg-disconnect-context/SKILL.md skills/abg-reconnect-context/SKILL.md skills/abg-disconnect-device/SKILL.md skills/abg-handshake/SKILL.md SHA256SUMS; do
     cmp -s "$root/$path" "$stage/$path" || fail "staged package differs: $path"
   done
   [ ! -e "$target" ] && [ ! -L "$target" ] || fail "versioned target appeared during copy: $target"

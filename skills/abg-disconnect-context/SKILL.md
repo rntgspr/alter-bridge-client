@@ -9,7 +9,7 @@ Use the current trusted hook/native actor ID, never another chat or an ID guesse
 
 Before leaving, end every local handshake session of this chat as `abg` **Handshake session** specifies and best-effort send each correlated revoke notice while messaging is still available. A notice failure never blocks leaving; report remote termination as unconfirmed.
 
-Run `abg disconnect context --id <trusted-id>`. This disables only this context. Never invoke `abg disconnect device`, stop the daemon, remove MCP, revoke credentials, or disconnect other chats.
+When the MCP `leave` tool is visible, call it with `actor` = trusted ID; otherwise run `abg disconnect context --id <trusted-id>`. This disables only this context. Never invoke `abg disconnect device`, stop the daemon, remove MCP, revoke credentials, or disconnect other chats.
 
 Repeated leave is safe. Disabled contexts disappear from the directory including all/disconnected listings, cannot use message tools or receive new notices, and cannot be recipients of new sends. Already submitted notices cannot be recalled. History, room IDs, unread data, consumed positions and ownership remain; explicit rejoin resumes retained unread data without copying it. Hooks/restarts/discovery cannot re-enable participation.
 

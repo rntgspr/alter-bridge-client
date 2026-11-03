@@ -23,3 +23,11 @@ For the saved remote broker directory, run `alter-bridge who` or
 `alter-bridge who --all`. The command requires active saved device credentials;
 it does not require a local daemon or Docker. See the server operator guidance
 for connection and activity meanings. Runtime behavior awaits Renato's manual check.
+
+After a native chat restart or clear issues a new session ID, run
+`abg reconnect context --provider <codex|claude|opencode> --previous-id <old-id> --id <new-id> [--name <friendly-name>] --tools-available`
+(or the `abg-reconnect-context` skill). It refuses identical IDs and an old ID
+that is not an owned binding of this device, leaves the old binding, then joins
+the new ID with the old name unless `--name` is given. Leave and join outcomes
+are reported separately; a failed join prints "old left, new not joined" and the
+retry command. Messages, rooms and cursors stay with the old ID.
