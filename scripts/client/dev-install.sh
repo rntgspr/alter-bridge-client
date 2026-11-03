@@ -79,7 +79,7 @@ if [[ -e "$plist" ]]; then
   [[ $(plutil -extract ProgramArguments.0 raw -o - "$plist") == "$current/bin/alter-bridge" ]]
 fi
 docker compose -f ../server/deploy/server/compose.yaml ps --status running --services | grep -qx server
-hexid=$(sh ../server/scripts/server/hexid.sh)
+hexid=$(sh ../server/scripts/hexid.sh)
 url="http://127.0.0.1:${ALTER_BRIDGE_PORT:-8787}"
 if [[ -f "$config" ]]; then
   jq -e --arg url "$url" '.token == null or .url == $url' "$config" >/dev/null || {
