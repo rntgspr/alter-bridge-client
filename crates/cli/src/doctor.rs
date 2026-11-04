@@ -106,13 +106,11 @@ fn delivery_counts(home: &Path) -> Option<(usize, usize)> {
 }
 
 /// Reports the stable installed binary and public alias without executing either.
-fn inspect_binary(home: &Path, attention: &mut bool) {
-    let bin =
-        crate::setup::stable_bin(home).unwrap_or_else(|| home.join(".local/bin/alter-bridge"));
-    let alias = bin.with_file_name("abg");
-    let current = fs::canonicalize(std::env::current_exe().unwrap_or_default()).ok();
-    let stable = fs::canonicalize(&bin).ok();
-    if stable.is_some() && stable == current {
+fn inspect_binary(attention: &mut bool) {
+    let bin = crate::setup::stable_bin();
+    let alias = bin.as_ref().map(|bin| bin.with_file_name("abg"));
+    let stable = bin.as_ref().and_then(|bin| fs::canonicalize(bin).ok());
+    if stable.is_some() {
         finding(
             "ok",
             "binary",
@@ -128,13 +126,13 @@ fn inspect_binary(home: &Path, attention: &mut bool) {
             "attention",
             "binary",
             "stable installed path missing or differs from this executable",
-            "install the current release at ~/.local/bin/alter-bridge or through Homebrew",
+            "install the current release with `brew install rntgspr/tap/alter-bridge`",
         );
     }
-    if fs::symlink_metadata(&alias).is_ok_and(|metadata| metadata.file_type().is_symlink())
-        && fs::canonicalize(&alias).ok() == stable
-        && stable.is_some()
-    {
+    if alias.is_some_and(|alias| {
+        fs::symlink_metadata(&alias).is_ok_and(|metadata| metadata.file_type().is_symlink())
+            && fs::canonicalize(&alias).ok() == stable
+    }) {
         finding("ok", "abg alias", "symlink points to stable binary", "none");
     } else {
         *attention = true;
@@ -142,7 +140,7 @@ fn inspect_binary(home: &Path, attention: &mut bool) {
             "attention",
             "abg alias",
             "missing or unexpected target",
-            "install the abg alias with the release installer",
+            "reinstall with `brew reinstall rntgspr/tap/alter-bridge`",
         );
     }
 }
@@ -366,7 +364,7 @@ fn inspect_provider(
     }
     let label = format!("{provider} hooks");
     if let Some(value) = &hook_value {
-        let mut valid = hook_bytes.is_some_and(|bytes| setup::verify_hooks(provider, home, bytes));
+        let mut valid = hook_bytes.is_some_and(|bytes| setup::verify_hooks(provider, bytes));
         if provider == "claude"
             && (value.get("disableAllHooks").and_then(Value::as_bool) == Some(true)
                 || value.get("allowManagedHooksOnly").and_then(Value::as_bool) == Some(true))
@@ -457,7 +455,7 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
         "local server operator: follow deployment Compose instructions; existing-server client: alter-bridge connect device <url> --hexid <code> [--id <device>]; remote clients do not need local Docker",
     );
 
-    inspect_binary(home, &mut attention);
+    inspect_binary(&mut attention);
     let path = config::path(home);
     let config_exists = match fs::symlink_metadata(&path) {
         Ok(metadata) => {

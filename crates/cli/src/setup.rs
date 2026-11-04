@@ -43,22 +43,17 @@ struct Change {
     next: Vec<u8>,
 }
 
-/// Returns the stable command path that resolves to the running CLI: the installer's
-/// `~/.local/bin/alter-bridge`, else the Homebrew `<prefix>/bin/alter-bridge` above a Cellar keg.
-pub(crate) fn stable_bin(home: &Path) -> Option<PathBuf> {
+/// Returns the Homebrew `<prefix>/bin/alter-bridge` above a Cellar keg when it resolves to the running CLI.
+pub(crate) fn stable_bin() -> Option<PathBuf> {
     let running = std::env::current_exe().and_then(fs::canonicalize).ok()?;
-    let local = home.join(".local/bin/alter-bridge");
 
     // Cellar layout: <prefix>/Cellar/alter-bridge/<version>/bin/alter-bridge
-    let brew = running
+    running
         .ancestors()
         .nth(5)
         .filter(|_| running.ancestors().nth(4).and_then(Path::file_name) == Some("Cellar".as_ref()))
-        .map(|prefix| prefix.join("bin/alter-bridge"));
-
-    std::iter::once(local)
-        .chain(brew)
-        .find(|path| fs::canonicalize(path).ok().as_ref() == Some(&running))
+        .map(|prefix| prefix.join("bin/alter-bridge"))
+        .filter(|path| fs::canonicalize(path).ok().as_ref() == Some(&running))
 }
 
 /// Returns the real package root bundled beside a Homebrew install, when present.
@@ -262,9 +257,9 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
         }
     }
     let tag = format!("v{VERSION}");
-    let bin = stable_bin(home).ok_or_else(|| {
+    let bin = stable_bin().ok_or_else(|| {
         Exit::Failure(
-            "native setup requires the running CLI at ~/.local/bin/alter-bridge or a Homebrew <prefix>/bin/alter-bridge; install this CLI there and run config through that path before configuring hooks".into(),
+            "native setup requires the running CLI at the Homebrew <prefix>/bin/alter-bridge; run `brew install rntgspr/tap/alter-bridge` and run config through that path before configuring hooks".into(),
         )
     })?;
     let bin_text = bin
@@ -638,7 +633,7 @@ pub(crate) fn verify_managed_entry(provider: &str, home: &Path) -> Result<(), St
                 .into(),
         );
     }
-    let bin = stable_bin(home).ok_or("stable alter-bridge binary path not found")?;
+    let bin = stable_bin().ok_or("stable alter-bridge binary path not found")?;
     let bin = bin.to_str().ok_or("binary path is not UTF-8")?;
     let helper = format!(
         "{} mcp headers --url {}",
@@ -734,7 +729,7 @@ pub(crate) fn refresh_managed_url(
         .and_then(Value::as_str)
         .ok_or("provider setup broker is absent")?
         .to_owned();
-    let bin = stable_bin(home).ok_or("stable alter-bridge binary path not found")?;
+    let bin = stable_bin().ok_or("stable alter-bridge binary path not found")?;
     let bin = bin.to_str().ok_or("binary path is not UTF-8")?;
     let old_helper = format!(
         "{} mcp headers --url {}",
@@ -1215,7 +1210,7 @@ fn merge_hooks(
 }
 
 /// Checks the installed owned hook groups against the bundled release template without writes.
-pub(crate) fn verify_hooks(provider: &str, home: &Path, existing: &[u8]) -> bool {
+pub(crate) fn verify_hooks(provider: &str, existing: &[u8]) -> bool {
     let template = if provider == "codex" {
         include_bytes!("../../../native-assets/codex-hooks.json").as_slice()
     } else {
@@ -1224,7 +1219,7 @@ pub(crate) fn verify_hooks(provider: &str, home: &Path, existing: &[u8]) -> bool
     let Ok(template) = serde_json::from_slice::<Value>(template) else {
         return false;
     };
-    let Some(bin) = stable_bin(home)
+    let Some(bin) = stable_bin()
         .as_deref()
         .and_then(Path::to_str)
         .map(shell_quote)

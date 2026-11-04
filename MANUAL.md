@@ -9,8 +9,8 @@ and changes no state. Extra arguments are rejected with usage exit code 2.
 The native MCP source workflow is described in
 the server operator guidance, and agent message handling in
 [skills/abg/SKILL.md](skills/abg/SKILL.md). The previous
-plugin-based notebook checklist is obsolete. Client packaging, the server image
-and confirmed setup are described in [INSTALL-OFFLINE.md](INSTALL-OFFLINE.md).
+plugin-based notebook checklist is obsolete. The client installs only through
+`brew install rntgspr/tap/alter-bridge`; packaging lives in `scripts/client/package.sh`.
 No archive has been built or published for this source version. Renato owns
 runtime E2E; no real provider exchange or wake-up result is claimed here.
 

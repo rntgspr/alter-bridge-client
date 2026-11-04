@@ -5,8 +5,8 @@ set -eu
 cd "$(dirname "$0")/.."
 cargo fmt --all -- --check
 cargo build --workspace --locked
-sh -n scripts/check.sh scripts/client/install.sh scripts/client/manifest.sh
-bash -n scripts/client/build.sh scripts/client/package.sh scripts/client/dev-install.sh scripts/client/dev-cleanup.sh
+sh -n scripts/check.sh scripts/client/manifest.sh
+bash -n scripts/client/build.sh scripts/client/package.sh
 generated=$(mktemp)
 trap 'rm -f "$generated"' EXIT HUP INT TERM
 sh scripts/client/manifest.sh > "$generated"

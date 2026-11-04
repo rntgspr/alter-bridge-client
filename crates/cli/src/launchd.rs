@@ -180,22 +180,15 @@ fn require_no_homebrew_service(home: &Path) -> Result<(), Exit> {
     Ok(())
 }
 
-/// Returns the executable the LaunchAgent starts: the stable current path when it is this binary,
-/// otherwise the invoked path, which keeps Homebrew's bin symlink (stable across upgrades) instead of its Cellar target.
-fn launch_binary(home: &Path) -> Result<PathBuf, Exit> {
+/// Returns the executable the LaunchAgent starts: the invoked path, which keeps Homebrew's bin symlink (stable across upgrades) instead of its Cellar target.
+fn launch_binary() -> Result<PathBuf, Exit> {
     let invoked = std::env::current_exe()
         .map_err(|error| Exit::Failure(format!("daemon: cannot resolve executable: {error}")))?;
     let executable = invoked
         .canonicalize()
         .map_err(|error| Exit::Failure(format!("daemon: cannot resolve executable: {error}")))?;
-    let stable = home.join(".local/share/alter-bridge/current/bin/alter-bridge");
 
-    if stable
-        .canonicalize()
-        .is_ok_and(|resolved| resolved == executable)
-    {
-        Ok(stable)
-    } else if invoked.is_absolute() {
+    if invoked.is_absolute() {
         Ok(invoked)
     } else {
         Ok(executable)
@@ -254,7 +247,7 @@ pub(crate) fn install(home: &Path) -> Result<(), Exit> {
     require_managed_definition(&plist)?;
     require_no_homebrew_service(home)?;
 
-    let contents = render(home, &launch_binary(home)?)?;
+    let contents = render(home, &launch_binary()?)?;
     let temporary = agents.join(format!(".{LABEL}.{}.tmp", std::process::id()));
     let written = File::options()
         .write(true)

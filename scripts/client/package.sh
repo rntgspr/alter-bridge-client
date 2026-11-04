@@ -22,7 +22,7 @@ mkdir -p dist
 stage=$(mktemp -d "$PWD/dist/.alter-bridge.XXXXXX")
 trap 'rm -rf "$stage"' EXIT
 package="$stage/alter-bridge-$tag"
-mkdir -p "$package/bin" "$package/scripts/client" "$package/native-assets"
+mkdir -p "$package/bin" "$package/native-assets"
 lipo -create -output "$package/bin/alter-bridge" \
   "$target_root/aarch64-apple-darwin/release/alter-bridge" \
   "$target_root/x86_64-apple-darwin/release/alter-bridge"
@@ -35,8 +35,6 @@ else
 fi
 codesign --verify --strict "$package/bin/alter-bridge"
 
-cp INSTALL-OFFLINE.md "$package/"
-cp scripts/client/install.sh "$package/scripts/client/"
 cp native-assets/manifest.json "$package/native-assets/"
 while IFS= read -r path; do
   mkdir -p "$package/$(dirname "$path")"
