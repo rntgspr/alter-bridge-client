@@ -398,7 +398,11 @@ pub(crate) fn resolve_provider(home: &Path, id: &str) -> Result<Provider, String
         return Ok(Provider::OpenCode);
     }
     let claude = find_claude_socket(home, id)?.is_some();
-    let codex = codex_loaded(home)?.iter().any(|loaded| loaded == id);
+    let codex = match codex_loaded(home) {
+        Ok(loaded) => loaded.iter().any(|loaded| loaded == id),
+        Err(_) if claude => false,
+        Err(error) => return Err(error),
+    };
 
     match (claude, codex) {
         (true, false) => Ok(Provider::Claude),
