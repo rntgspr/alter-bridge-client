@@ -24,6 +24,16 @@ For the saved remote broker directory, run `alter-bridge who` or
 it does not require a local daemon or Docker. See the server operator guidance
 for connection and activity meanings. Runtime behavior awaits Renato's manual check.
 
+To exercise wake-up, run `alter-bridge probe <actor> [message] [--local] [--async]`.
+`<actor>` is an exact ID, name or `device::name` (optional leading `#`). The
+default body is `Test probe: please do not reply.` Without `--local` the CLI
+joins a transient `abg_probe_<nanoid>` binding, sends through MCP `send`, waits
+up to 15s for the delivered receipt (recorded by the local daemon under
+`~/.local/state/alter-bridge/probes/`, so restart an outdated daemon first),
+then leaves the binding; `--async` returns after the send. `--local` rings one
+binding owned by this device directly, writes nothing to the broker and carries
+no body. Recipients see a metadata-only probe notice with no reply expected.
+
 After a native chat restart or clear issues a new session ID, run
 `abg reconnect context --provider <codex|claude|opencode> --previous-id <old-id> --id <new-id> [--name <friendly-name>] --tools-available`
 (or the `abg-reconnect-context` skill). It refuses identical IDs and an old ID

@@ -733,10 +733,16 @@ fn advertisement(home: &Path, prior: &Config) -> Result<(Config, DaemonAdvertise
         ));
     }
 
-    let sessions: Vec<Author> = local
+    let mut sessions: Vec<Author> = local
         .into_iter()
         .filter(|candidate| owned.iter().any(|binding| binding.id == candidate.id))
         .collect();
+    sessions.extend(
+        owned
+            .iter()
+            .filter(|binding| crate::probe::is_probe(&binding.id))
+            .cloned(),
+    );
     if sessions.len() > 1000 {
         return Err("daemon: more than 1000 active identities cannot be advertised".into());
     }

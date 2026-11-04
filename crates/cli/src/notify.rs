@@ -72,6 +72,13 @@ pub(crate) fn notice(ping: &Ping) -> String {
         );
     }
 
+    if crate::probe::is_probe(&ping.author.id) {
+        return format!(
+            "alter-bridge: test probe from {} (msgid {}). No reply is needed and the sender cannot receive one; reading the inbox is optional. The notice contains metadata only.",
+            ping.author.name, ping.message_id
+        );
+    }
+
     format!(
         "alter-bridge: new message from {} ({}) (msgid {}). Load the abg skill and call the MCP inbox tool with actor {}. The notice contains metadata only.",
         address::alias(&ping.author.id),
@@ -243,6 +250,10 @@ fn ring_claude(home: &Path, ping: &Ping, notice: &str) -> Result<(), String> {
 /// Hands one notice to the recipient's provider; `Ok` means the local transport accepted it,
 /// never that a user or model saw or approved it.
 pub fn ring(home: &Path, ping: &Ping) -> Result<(), String> {
+    if crate::probe::is_probe(&ping.to.id) {
+        return crate::probe::record(home, ping);
+    }
+
     let notice = notice(ping);
 
     match session::resolve_provider(home, &ping.to.id)? {

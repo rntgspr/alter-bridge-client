@@ -232,6 +232,48 @@ impl Client {
         read_response(response, 200)
     }
 
+    /// Calls one broker MCP tool statelessly and returns its structured result or a public error.
+    pub(crate) fn mcp_tool(
+        &self,
+        token: &str,
+        name: &str,
+        arguments: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let response = self
+            .agent
+            .post(format!("{}/mcp", self.url))
+            .header("Authorization", format!("Bearer {token}"))
+            .header("Accept", "application/json, text/event-stream")
+            .header("MCP-Protocol-Version", "2025-06-18")
+            .send_json(serde_json::json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": name, "arguments": arguments},
+            }))
+            .map_err(|error| CallError::from(error).public_message())?;
+        let body: serde_json::Value =
+            read_response(response, 200).map_err(|error| error.public_message())?;
+
+        if let Some(error) = body.get("error") {
+            return Err(format!(
+                "MCP error {}",
+                error["message"].as_str().unwrap_or("without message")
+            ));
+        }
+        let result = &body["result"];
+        if result["isError"].as_bool() == Some(true) {
+            return Err(format!(
+                "tool refused: {}",
+                result["structuredContent"]["error"]["code"]
+                    .as_str()
+                    .unwrap_or("unknown")
+            ));
+        }
+
+        Ok(result["structuredContent"].clone())
+    }
+
     /// Revokes only the registration selected by the saved disconnect key and current pairing code.
     pub(crate) fn disconnect(
         &self,

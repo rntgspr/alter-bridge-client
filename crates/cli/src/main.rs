@@ -11,6 +11,7 @@ mod launchd;
 mod mcp;
 mod notify;
 mod opencode;
+mod probe;
 mod session;
 mod setup;
 mod who;
@@ -33,6 +34,7 @@ commands:
   who [--all]  list participating broker sessions (connected devices by default)
   hook codex|claude [--register-only]  native lifecycle hook
   mcp headers --url <broker>|codex|claude [args...]  helper or provider launcher
+  probe <actor> [message] [--local] [--async]  send a no-reply wake-up test (--local rings this device only, no broker write)
 
 Messaging uses native MCP tools. This build does not support v1.
 ";
@@ -93,6 +95,7 @@ fn dispatch(args: &[String]) -> Result<(), Exit> {
         "who" => who::run(rest, &home),
         "hook" => hook::run(rest, &home),
         "mcp" => mcp::run(rest, &home),
+        "probe" => probe::run(rest, &home),
         "-h" | "--help" | "help" => {
             print!("{USAGE}");
             Ok(())

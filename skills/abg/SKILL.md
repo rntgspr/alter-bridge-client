@@ -57,6 +57,8 @@ The device channel distinguishes `notice_kind: message` from `notice_kind: recei
 
 For a receipt-only notice, do not fetch the inbox, send a reply, acknowledge consumption or ask for an execution PIN. Receipt submission is acknowledged automatically by the daemon and cannot generate receipt loops. A peer message containing a request for work still follows the PIN policy below, regardless of its message type.
 
+A notice from an `abg_probe_*` author is a CLI wake-up test (`alter-bridge probe`). Do not reply: the sender is a transient CLI binding that cannot receive one. Reading the inbox is optional; an ephemeral `--local` probe has no inbox message at all.
+
 ## Presentation
 
 Show every sent or retrieved message, and every notice, as one header line, like a message in a chat interface, instead of narrating its fields. Use one item per line, ordered by position, separated by blank lines, and keep any commentary to one line after them. Use ASCII only.
