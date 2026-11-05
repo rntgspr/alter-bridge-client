@@ -3,14 +3,14 @@
   "files": {
     "native-assets/claude-hooks.json": "4688256201729ed7a5348d8477725b4a159abcf5218649dd4bcc6970bb539105",
     "native-assets/codex-hooks.json": "c5e89ef8da4d255663efe3a971f607493f494af6a4e4d59b20de4a57ab83d2a2",
-    "skills/abg-connect-context/SKILL.md": "eb5d6f86051621b050bd55f738c74c6ba9e77d88d00631da4b720b34192d3ed9",
-    "skills/abg-connect-device/SKILL.md": "07cc2b58034f631ea14885fb0ed766de60b1983d94c9aec393475eb545d82693",
+    "skills/abg-connect-context/SKILL.md": "c4c1ff05e5ceda5669c41aa3afc793bd2513585902e02a23990eb91b58ebedae",
+    "skills/abg-connect-device/SKILL.md": "0b9166d0a48a699b52a3b392512f3d9bf3041b1ed1b1968be395fe010112becc",
     "skills/abg-disconnect-context/SKILL.md": "50568b604809868fe181a4f33be72e1655ac4b19ed4eaacf175090dd914d23d4",
     "skills/abg-disconnect-device/SKILL.md": "3ee294da6b08f14e68c18d6a896b2fd214147f39588685751600c11e62c7ea10",
     "skills/abg-doctor/SKILL.md": "793ad2416ce3777e4ea1d73f2b9e2771ef270ffcd8dc267e2f830d082b44ae36",
-    "skills/abg-handshake/SKILL.md": "24601ee44a2cf9f1b1b978a29b140c7f3c326b517e5b7095090ecd0a9d7e1221",
-    "skills/abg-reconnect-context/SKILL.md": "c185c16914cf74e7f5cac15bc1e3c64b392c8aa510733083b4c1913afce69e35",
+    "skills/abg-handshake/SKILL.md": "88339a414764827945b729c8703fc458df0e0ca94628a3865254ac7bf4e71875",
+    "skills/abg-reconnect-context/SKILL.md": "3a70e13bb841619bdef1e49e31061833220941d5c73a4e4fb402495125c24857",
     "skills/abg-who/SKILL.md": "58d5318a692adb3bf87d2b67b7e62826442b4af14650c516733262c2328818f9",
-    "skills/abg/SKILL.md": "6ba7c4e634615c8559b32ff71d4982c86da5e1aae1c00fa76bc16b4ffad1899b"
+    "skills/abg/SKILL.md": "4b21e2e53a0cf07b2ccfd5c11a6899a65742415bd56d5d8b99642a6363e6456e"
   }
 }
