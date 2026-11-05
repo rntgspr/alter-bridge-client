@@ -4,7 +4,7 @@ use std::path::Path;
 
 use alter_bridge_protocol::{DeviceConnectRequest, DeviceDisconnectRequest, DeviceState, limits};
 
-use crate::{Exit, api::Client, config, daemon, setup};
+use crate::{Exit, api::Client, config, daemon, setup, trust};
 
 const CONNECT_USAGE: &str = "usage: alter-bridge connect device [url] [--hexid <six lowercase hex>] [--id <device>]\nSaved credentials are reused before issuance. Missing URL/hexid requires the device skill.\n";
 const DISCONNECT_USAGE: &str = "usage: alter-bridge disconnect device --hexid <six lowercase hex> [--id <saved-device>]\n--id defaults to the saved device ID. The private disconnect key is read from the saved configuration.\n";
@@ -287,6 +287,9 @@ pub(crate) fn context(args: &[String], home: &Path, leave: bool) -> Result<(), E
             .leave_session(&saved.token, &actor)
             .map_err(|error| Exit::Failure(error.public_message()))?;
         println!("{outcome}");
+        if let Err(error) = trust::clear_actor(home, id) {
+            eprintln!("alter-bridge: {error}");
+        }
         return Ok(());
     }
     let Some(provider) =
@@ -525,6 +528,9 @@ pub(crate) fn disconnect(args: &[String], home: &Path) -> Result<(), Exit> {
         "device {} disconnected; saved URL, ID and setup preferences retained",
         saved.device_id
     );
+    if let Err(error) = trust::clear_all(home) {
+        eprintln!("alter-bridge: {error}");
+    }
     daemon::run(&["stop".into()], home).map_err(|error| {
         let detail = match error { Exit::Failure(message) | Exit::Usage(message) => message };
         Exit::Failure(format!("disconnect: server acknowledged and local credentials cleared, but daemon stop failed: {detail}"))

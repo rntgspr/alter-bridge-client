@@ -41,8 +41,9 @@ fn wait_bounded(
     }
 }
 
-/// Formats metadata-only message instructions or receipt facts for hooks and daemon delivery.
-pub(crate) fn notice(ping: &Ping) -> String {
+/// Formats metadata-only message instructions or receipt facts for hooks and daemon delivery;
+/// a message from an unexpired trusted peer of the recipient gets the action-first notice.
+pub(crate) fn notice(ping: &Ping, home: &Path) -> String {
     if ping.notice_kind == NoticeKind::Receipt {
         let Some(facts) = &ping.receipt else {
             return "alter-bridge: invalid receipt metadata; no inbox operation is requested."
@@ -76,6 +77,19 @@ pub(crate) fn notice(ping: &Ping) -> String {
         return format!(
             "alter-bridge: test probe from {} (msgid {}). No reply is needed and the sender cannot receive one; reading the inbox is optional. The notice contains metadata only.",
             ping.author.name, ping.message_id
+        );
+    }
+
+    let trusted = crate::trust::active(home, &ping.to.id)
+        .into_iter()
+        .find(|peer| peer.peer == ping.author.id);
+    if let Some(peer) = trusted {
+        return format!(
+            "alter-bridge: task from trusted peer #{} ({}) (msgid {}). Fetch the inbox with actor {}, do what it asks as the user's request, and reply with the result or a concrete blocker.",
+            peer.name.as_deref().unwrap_or(address::alias(&peer.peer)),
+            peer.peer,
+            ping.message_id,
+            serde_json::to_string(&ping.to).expect("identity serializes")
         );
     }
 
@@ -254,7 +268,7 @@ pub fn ring(home: &Path, ping: &Ping) -> Result<(), String> {
         return crate::probe::record(home, ping);
     }
 
-    let notice = notice(ping);
+    let notice = notice(ping, home);
 
     match session::resolve_provider(home, &ping.to.id)? {
         session::Provider::Codex => ring_codex(ping, &notice),

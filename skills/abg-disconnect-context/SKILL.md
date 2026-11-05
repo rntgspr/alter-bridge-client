@@ -7,7 +7,7 @@ description: Explicitly leave Alter Bridge for only the current native chat.
 
 Use the current trusted hook/native actor ID, never another chat or an ID guessed from cwd, names, recent sessions or MCP requests. Without a current ID, stop with that limitation; explicit operator input does not attest model identity.
 
-Before leaving, end every local handshake session of this chat as `abg` **Handshake session** specifies and best-effort send each correlated revoke notice while messaging is still available. A notice failure never blocks leaving; report remote termination as unconfirmed.
+A successful leave also removes every local peer trust entry of this actor; no peer notice is needed.
 
 When the MCP `leave` tool is visible, call it with `actor` = trusted ID; otherwise run `abg disconnect context --id <trusted-id>`. This disables only this context. Never invoke `abg disconnect device`, stop the daemon, remove MCP, revoke credentials, or disconnect other chats.
 

@@ -14,6 +14,7 @@ mod opencode;
 mod probe;
 mod session;
 mod setup;
+mod trust;
 mod who;
 
 use std::path::PathBuf;
@@ -35,6 +36,7 @@ commands:
   hook codex|claude [--register-only]  native lifecycle hook
   mcp headers --url <broker>|codex|claude [args...]  helper or provider launcher
   probe <actor> [message] [--local] [--async]  send a no-reply wake-up test (--local rings this device only, no broker write)
+  trust grant|revoke|list --id <self> [--peer <id>] [--name <name>]  local peer trust (24h)
 
 Messaging uses native MCP tools. This build does not support v1.
 ";
@@ -96,6 +98,7 @@ fn dispatch(args: &[String]) -> Result<(), Exit> {
         "hook" => hook::run(rest, &home),
         "mcp" => mcp::run(rest, &home),
         "probe" => probe::run(rest, &home),
+        "trust" => trust::run(rest, &home),
         "-h" | "--help" | "help" => {
             print!("{USAGE}");
             Ok(())

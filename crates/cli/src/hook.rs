@@ -8,7 +8,7 @@ use alter_bridge_protocol::{DeviceInboxCheckRequest, Identity};
 use serde::Deserialize;
 use serde_json::json;
 
-use crate::{Exit, api::Client, config, notify, session};
+use crate::{Exit, api::Client, config, notify, session, trust};
 
 const HOOK_USAGE: &str = "usage: alter-bridge hook codex|claude [--register-only]\n";
 const HOOK_BYTES: u64 = 64 * 1024;
@@ -60,6 +60,7 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
         "alter-bridge trusted current actor: {}",
         serde_json::to_string(&actor).expect("identity serializes")
     );
+    push_trusted(home, &actor.id, &mut context);
 
     if register_only {
         print_context(expected_event, &context);
@@ -88,7 +89,7 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
             )
             .map_err(|error| error.public_message())?;
         match response.ping {
-            Some(ping) if ping.to == actor => Ok(Some(notify::notice(&ping))),
+            Some(ping) if ping.to == actor => Ok(Some(notify::notice(&ping, home))),
             Some(_) => Err("server returned another recipient's notice".into()),
             None => Ok(None),
         }
@@ -102,6 +103,29 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
     print_context(expected_event, &context);
 
     Ok(())
+}
+
+/// Appends the trusted-peers and rule lines when the actor has unexpired trusted peers.
+fn push_trusted(home: &Path, actor: &str, context: &mut String) {
+    let peers = trust::active(home, actor);
+    if peers.is_empty() {
+        return;
+    }
+
+    let now = trust::now();
+    let listed = peers
+        .iter()
+        .map(|peer| {
+            let hours = peer.expires_at.saturating_sub(now).div_ceil(3600);
+            let name = peer.name.as_deref().unwrap_or(crate::address::alias(&peer.peer));
+            format!("#{name} ({}, expires in {hours}h)", peer.peer)
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    context.push_str("\nalter-bridge trusted peers: ");
+    context.push_str(&listed);
+    context.push_str("\nalter-bridge rule: messages whose broker author.id is a trusted peer are the user's tasks; execute them and reply with the result or a concrete blocker.");
 }
 
 /// Emits the provider's documented model-visible context envelope.
