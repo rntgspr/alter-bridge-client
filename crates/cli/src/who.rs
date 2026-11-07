@@ -5,7 +5,7 @@ use std::path::Path;
 use crate::{Exit, api, config};
 
 /// Renders broker-provided data as inert terminal text.
-fn safe(value: &str) -> String {
+pub(crate) fn safe(value: &str) -> String {
     value
         .chars()
         .map(|character| {
@@ -47,9 +47,9 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
     }
 
     if all {
-        println!("NAME\tSESSION ID\tDEVICE ID\tACTIVE\tCONNECTED");
+        println!("NAME\tSESSION ID\tDEVICE ID\tACTIVE\tHELD\tCONNECTED");
     } else {
-        println!("NAME\tSESSION ID\tDEVICE ID\tACTIVE");
+        println!("NAME\tSESSION ID\tDEVICE ID\tACTIVE\tHELD");
     }
     for entry in sessions {
         let name = safe(&entry.binding.name);
@@ -57,11 +57,11 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
         let device = safe(&entry.device_id);
         if all {
             println!(
-                "{name}\t{id}\t{device}\t{}\t{}",
-                entry.active, entry.connected
+                "{name}\t{id}\t{device}\t{}\t{}\t{}",
+                entry.active, entry.held, entry.connected
             );
         } else {
-            println!("{name}\t{id}\t{device}\t{}", entry.active);
+            println!("{name}\t{id}\t{device}\t{}\t{}", entry.active, entry.held);
         }
     }
 

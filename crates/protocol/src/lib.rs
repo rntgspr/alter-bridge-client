@@ -98,6 +98,8 @@ pub struct DirectoryEntry {
     pub device_id: String,
     pub connected: bool,
     pub active: bool,
+    #[serde(default)]
+    pub held: bool,
 }
 
 /// Shared directory result for HTTP and MCP callers.

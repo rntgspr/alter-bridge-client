@@ -6,6 +6,7 @@ mod config;
 mod connect;
 mod daemon;
 mod doctor;
+mod hold;
 mod hook;
 mod launchd;
 mod mcp;
@@ -35,6 +36,8 @@ commands:
   who [--all]  list participating broker sessions (connected devices by default)
   hook codex|claude [--register-only]  native lifecycle hook
   mcp headers --url <broker>|codex|claude [args...]  helper or provider launcher
+  hold <actor>  hold an owned context (no wake-ups until release)
+  release <actor>  release a held owned context
   probe <actor> [message] [--local] [--async]  send a no-reply wake-up test (--local rings this device only, no broker write)
   trust grant|revoke|list --id <self> [--peer <id>] [--name <name>]  local peer trust (24h)
 
@@ -97,6 +100,7 @@ fn dispatch(args: &[String]) -> Result<(), Exit> {
         "who" => who::run(rest, &home),
         "hook" => hook::run(rest, &home),
         "mcp" => mcp::run(rest, &home),
+        "hold" | "release" => hold::run(command, rest, &home),
         "probe" => probe::run(rest, &home),
         "trust" => trust::run(rest, &home),
         "-h" | "--help" | "help" => {

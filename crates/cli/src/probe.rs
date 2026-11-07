@@ -60,7 +60,11 @@ fn nanoid() -> Result<String, Exit> {
 }
 
 /// Resolves an actor reference to exactly one binding among the candidates.
-fn resolve<'a>(reference: &str, candidates: &'a [(Author, String)]) -> Result<&'a Author, Exit> {
+pub(crate) fn resolve<'a>(
+    command: &str,
+    reference: &str,
+    candidates: &'a [(Author, String)],
+) -> Result<&'a Author, Exit> {
     let reference = reference.strip_prefix('#').unwrap_or(reference);
     let matches: Vec<&(Author, String)> = candidates
         .iter()
@@ -74,10 +78,10 @@ fn resolve<'a>(reference: &str, candidates: &'a [(Author, String)]) -> Result<&'
     match matches.as_slice() {
         [(binding, _)] => Ok(binding),
         [] => Err(Exit::Failure(format!(
-            "probe: no participating session matches {reference:?}"
+            "{command}: no participating session matches {reference:?}"
         ))),
         many => Err(Exit::Failure(format!(
-            "probe: {reference:?} is ambiguous ({}); use device::name or the exact ID",
+            "{command}: {reference:?} is ambiguous ({}); use device::name or the exact ID",
             many.iter()
                 .map(|(binding, device)| format!("{device}::{} {}", binding.name, binding.id))
                 .collect::<Vec<_>>()
@@ -127,7 +131,7 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
         .filter(|entry| !is_probe(&entry.binding.id))
         .map(|entry| (entry.binding, entry.device_id))
         .collect();
-    let target = resolve(reference, &candidates)?.clone();
+    let target = resolve("probe", reference, &candidates)?.clone();
 
     let probe = Author {
         id: format!("{PREFIX}{id}"),
@@ -245,7 +249,7 @@ fn ring_local(
         .filter(|binding| !is_probe(&binding.id))
         .map(|binding| (binding, saved.device_id.clone()))
         .collect();
-    let target = resolve(reference, &candidates).map_err(|error| match error {
+    let target = resolve("probe", reference, &candidates).map_err(|error| match error {
         Exit::Failure(message) => Exit::Failure(format!("{message} on this device (--local)")),
         other => other,
     })?;
