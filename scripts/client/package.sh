@@ -26,7 +26,9 @@ mkdir -p "$package/bin" "$package/native-assets"
 lipo -create -output "$package/bin/alter-bridge" \
   "$target_root/aarch64-apple-darwin/release/alter-bridge" \
   "$target_root/x86_64-apple-darwin/release/alter-bridge"
-lipo "$package/bin/alter-bridge" -verify_arch arm64 x86_64 || fail 'universal executable lacks a required architecture'
+for arch in arm64 x86_64; do
+  lipo "$package/bin/alter-bridge" -verify_arch "$arch" || fail "universal executable lacks $arch"
+done
 identity="${CODESIGN_IDENTITY:--}"
 if [[ "$identity" == '-' ]]; then
   codesign --force --sign - --timestamp=none "$package/bin/alter-bridge"
