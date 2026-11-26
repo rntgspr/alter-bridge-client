@@ -333,6 +333,40 @@ fn codex_open_threads() -> Result<Vec<String>, String> {
     Ok(ids)
 }
 
+/// Reports whether ChatGPT.app's bundled Codex app-server process is running.
+fn codex_app_running() -> Result<bool, String> {
+    let status = Command::new("pgrep")
+        .args([
+            "-f",
+            "/ChatGPT.app/Contents/Resources/codex-cli/.* app-server",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|error| format!("session: pgrep: {error}"))?;
+
+    match status.code() {
+        Some(0) => Ok(true),
+        Some(1) => Ok(false),
+        _ => Err(format!("session: pgrep: {status}")),
+    }
+}
+
+/// Lists Codex user threads the app can open, while ChatGPT.app runs: a thread not loaded in a CLI is treated as an app chat whose queue holds the notice until it opens.
+fn codex_app_reachable(home: &Path) -> Result<Vec<Session>, String> {
+    if !codex_app_running()? {
+        return Ok(Vec::new());
+    }
+
+    query_sqlite(
+        &codex_state_db(home),
+        "select id, coalesce(name, '') as name from threads \
+         where archived = 0 \
+         and coalesce(thread_source, 'user') not in ('subagent', 'guardian_review')",
+    )
+}
+
 /// Reports whether an ID has the provider's full native form, usable without its store.
 pub(crate) fn is_full_id(provider: Provider, id: &str) -> bool {
     match provider {
@@ -493,7 +527,11 @@ pub(crate) fn resolve_provider(home: &Path, id: &str) -> Result<Provider, String
     }
     let claude = find_claude_socket(home, id)?.is_some();
     let open = codex_open_threads().is_ok_and(|ids| ids.iter().any(|open| open == id));
+    let app = !open
+        && codex_app_reachable(home)
+            .is_ok_and(|threads| threads.iter().any(|thread| thread.id == id));
     let codex = open
+        || app
         || match codex_loaded(home) {
             Ok(loaded) => loaded.iter().any(|loaded| loaded == id),
             Err(_) if claude => false,
@@ -508,7 +546,7 @@ pub(crate) fn resolve_provider(home: &Path, id: &str) -> Result<Provider, String
     }
 }
 
-/// Lists unambiguous active IDs from Claude sockets, Codex threads loaded by any codex process (control socket or open rollout), and running OpenCode sessions.
+/// Lists unambiguous active IDs from Claude sockets, Codex threads loaded by any codex process (control socket or open rollout) or reachable through a running ChatGPT.app, and running OpenCode sessions.
 pub(crate) fn active(home: &Path) -> (Vec<Author>, Vec<String>) {
     let mut errors = Vec::new();
     let mut active: Vec<Author> = claude_agents(home)
@@ -569,6 +607,20 @@ pub(crate) fn active(home: &Path) -> (Vec<Author>, Vec<String>) {
         })
         .collect();
     active.extend(open);
+
+    let app: Vec<Author> = codex_app_reachable(home)
+        .unwrap_or_else(|error| {
+            errors.push(error);
+            Vec::new()
+        })
+        .into_iter()
+        .filter(|session| !active.iter().any(|author| author.id == session.id))
+        .map(|session| Author {
+            id: session.id,
+            name: session.name,
+        })
+        .collect();
+    active.extend(app);
 
     active.retain(|author| is_full_id(Provider::Claude, &author.id));
     active.extend(crate::opencode::active(home).unwrap_or_else(|error| {

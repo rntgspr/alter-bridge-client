@@ -50,7 +50,10 @@ Each chat must run `abg-connect-context` once to appear in `who` and receive
 pings. A Codex chat counts as active where it is loaded now, whichever client
 created it: when the external app-server control socket lists it, or when any
 running `codex` process (the ChatGPT.app app-server or a CLI) holds its rollout
-file open. A loaded chat runs the notice in about 10 s; a chat that is not
-loaded gets no ring, and its messages wait in the inbox. `alter-bridge doctor`
+file open. A loaded chat runs the notice in about 10 s. Otherwise, while
+ChatGPT.app runs, every non-archived user thread counts as an app chat: the
+Codex queue holds the notice and the chat runs it when the user opens it.
+Without ChatGPT.app, a chat that is not loaded gets no ring, and its messages
+wait in the inbox. `alter-bridge doctor`
 labels each owned Codex binding by its creating client (`chatgpt-app`, `cli` or
 `unknown`, from `threads.originator`) and warns when its rollout file is missing.
