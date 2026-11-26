@@ -16,5 +16,7 @@ This is an explicit opt-in operation. Startup, normal prompts, MCP initializatio
 7. When the MCP `connect` tool is visible, call it with `actor` = trusted ID and `name`. Otherwise run `abg connect context --provider <provider> --id <trusted-id> --name <friendly-name> --tools-available`; this last flag records the skill's observation of tools; CLI cannot inspect the model tool registry.
 8. Report device connection, native configuration, actual tools and context registration independently. Repeated explicit join may refresh the name. No inbox retrieval, message consumption or send is part of connecting. After a native restart or clear issued a new ID for an already joined chat, use `abg-reconnect-context` instead.
 
+A Codex chat inside ChatGPT.app joins the same way, as provider `codex`; nothing joins it automatically.
+
 MCP authorization comes privately from saved device credentials through the URL-bound helper. Never request/print a bearer, place it literally in config, or use a token value as `bearer_token_env_var`.
 

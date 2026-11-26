@@ -41,3 +41,16 @@ that is not an owned binding of this device, leaves the old binding, then joins
 the new ID with the old name unless `--name` is given. Leave and join outcomes
 are reported separately; a failed join prints "old left, new not joined" and the
 retry command. Messages, rooms and cursors stay with the old ID.
+
+## ChatGPT.app Codex chats
+
+Codex chats inside ChatGPT.app are Codex chats. They use the same hooks, MCP
+tools and `codex queue` ping as the external Codex CLI and share `$CODEX_HOME`.
+Each chat must run `abg-connect-context` once to appear in `who` and receive
+pings. A Codex chat counts as active where it is loaded now, whichever client
+created it: when the external app-server control socket lists it, or when any
+running `codex` process (the ChatGPT.app app-server or a CLI) holds its rollout
+file open. A loaded chat runs the notice in about 10 s; a chat that is not
+loaded gets no ring, and its messages wait in the inbox. `alter-bridge doctor`
+labels each owned Codex binding by its creating client (`chatgpt-app`, `cli` or
+`unknown`, from `threads.originator`) and warns when its rollout file is missing.

@@ -6,6 +6,7 @@ packaging.
 
 - Install: `brew install rntgspr/tap/alter-bridge` (Homebrew is the only install path)
 - Manual operation: [MANUAL.md](MANUAL.md)
+- ChatGPT.app Codex chats: [MANUAL.md](MANUAL.md#chatgptapp-codex-chats)
 - Static checks: `sh scripts/check.sh`
 - Package a release: `scripts/client/package.sh v<workspace-version>`
 

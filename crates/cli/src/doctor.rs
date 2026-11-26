@@ -105,6 +105,47 @@ fn delivery_counts(home: &Path) -> Option<(usize, usize)> {
     Some((submitted, failed))
 }
 
+/// Labels owned Codex bindings as ChatGPT.app or CLI chats and warns on a missing rollout file; never fails doctor.
+fn inspect_codex_origins(home: &Path, sessions: &[alter_bridge_protocol::Author]) {
+    let ids: Vec<String> = sessions.iter().map(|session| session.id.clone()).collect();
+    let origins = match crate::session::codex_origins(home, &ids) {
+        Ok(origins) => origins,
+        Err(error) => {
+            finding("unknown", "codex binding origin", &error, "none");
+            return;
+        }
+    };
+
+    for origin in origins {
+        let name = sessions
+            .iter()
+            .find(|session| session.id == origin.id)
+            .map_or(origin.id.as_str(), |session| session.name.as_str());
+        let label = if crate::session::CODEX_APP_ORIGINATORS.contains(&origin.originator.as_str()) {
+            "chatgpt-app"
+        } else if origin.originator == "codex-tui" {
+            "cli"
+        } else {
+            "unknown"
+        };
+        finding(
+            "ok",
+            &format!("codex binding {name}"),
+            &format!("{label} ({})", origin.originator),
+            "none",
+        );
+
+        if origin.rollout_path.is_empty() || !Path::new(&origin.rollout_path).is_file() {
+            finding(
+                "attention",
+                &format!("codex binding {name}"),
+                "rollout file missing; the chat cannot load and queued pings stay pending",
+                "open the chat in Codex or leave its binding",
+            );
+        }
+    }
+}
+
 /// Reports the stable installed binary and public alias without executing either.
 fn inspect_binary(attention: &mut bool) {
     let bin = crate::setup::stable_bin();
@@ -817,12 +858,16 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
                                 );
                             } else {
                                 match api::Client::with_timeout(url, remaining).sessions(token) {
-                                    Ok(sessions) if !sessions.is_empty() => finding(
-                                        "ok",
-                                        "native registration",
-                                        "owned bindings recorded; live provider execution unchecked",
-                                        "none",
-                                    ),
+                                    Ok(sessions) if !sessions.is_empty() => {
+                                        finding(
+                                            "ok",
+                                            "native registration",
+                                            "owned bindings recorded; live provider execution unchecked",
+                                            "none",
+                                        );
+
+                                        inspect_codex_origins(home, &sessions);
+                                    }
                                     Ok(_) => {
                                         finding(
                                             "unchecked",

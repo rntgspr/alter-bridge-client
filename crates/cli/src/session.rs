@@ -206,9 +206,10 @@ fn query_sqlite(database: &Path, query: &str) -> Result<Vec<Session>, String> {
         return Err(format!("session: no database at {}", database.display()));
     }
 
-    let uri = format!("file:{}?mode=ro", database.display());
+    // macOS /usr/bin/sqlite3 cannot open this WAL database read-only; -safe plus select-only queries stand in.
+    let path = database.to_string_lossy();
     let stdout = output_of(
-        Command::new("sqlite3").args(["-json", &uri, query]),
+        Command::new("sqlite3").args(["-json", "-safe", &path, query]),
         "sqlite3",
     )?;
     if stdout.trim_ascii().is_empty() {
@@ -227,16 +228,109 @@ fn query_sqlite(database: &Path, query: &str) -> Result<Vec<Session>, String> {
         .collect())
 }
 
+/// Codex `threads.originator` values written by ChatGPT.app builds; not a public Codex contract.
+pub(crate) const CODEX_APP_ORIGINATORS: [&str; 2] = ["Codex Desktop", "codex_work_desktop"];
+
+/// Returns the Codex state database path under `CODEX_HOME`, defaulting to `~/.codex`.
+pub(crate) fn codex_state_db(home: &Path) -> PathBuf {
+    std::env::var_os("CODEX_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home.join(".codex"))
+        .join("state_5.sqlite")
+}
+
 /// Lists Codex thread titles from the current read-only database snapshot.
 fn codex_sessions(home: &Path) -> Result<Vec<Session>, String> {
-    let codex = std::env::var_os("CODEX_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".codex"));
-
     query_sqlite(
-        &codex.join("state_5.sqlite"),
+        &codex_state_db(home),
         "select id, coalesce(name, '') as name, archived from threads order by updated_at desc",
     )
+}
+
+/// One Codex thread's creating client and rollout file, read for diagnosis only.
+pub(crate) struct CodexOrigin {
+    pub id: String,
+    pub originator: String,
+    pub rollout_path: String,
+}
+
+/// Reads originator and rollout path for the given full-form Codex thread IDs; other IDs are ignored.
+pub(crate) fn codex_origins(home: &Path, ids: &[String]) -> Result<Vec<CodexOrigin>, String> {
+    #[derive(Deserialize)]
+    struct Row {
+        id: String,
+        #[serde(default)]
+        originator: Option<String>,
+        #[serde(default)]
+        rollout_path: Option<String>,
+    }
+
+    let ids = ids
+        .iter()
+        .filter(|id| is_full_id(Provider::Codex, id))
+        .map(|id| format!("'{id}'"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let database = codex_state_db(home);
+    if !database.is_file() {
+        return Err(format!("session: no database at {}", database.display()));
+    }
+
+    // macOS /usr/bin/sqlite3 cannot open this WAL database read-only; -safe plus select-only queries stand in.
+    let path = database.to_string_lossy();
+    let query = format!("select id, originator, rollout_path from threads where id in ({ids})");
+    let stdout = output_of(
+        Command::new("sqlite3").args(["-json", "-safe", &path, &query]),
+        "sqlite3",
+    )?;
+    if stdout.trim_ascii().is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let rows: Vec<Row> = serde_json::from_slice(&stdout)
+        .map_err(|error| format!("session: unexpected sqlite3 output: {error}"))?;
+
+    Ok(rows
+        .into_iter()
+        .map(|row| CodexOrigin {
+            id: row.id,
+            originator: row.originator.unwrap_or_default(),
+            rollout_path: row.rollout_path.unwrap_or_default(),
+        })
+        .collect())
+}
+
+/// Lists Codex thread IDs whose rollout file a running `codex` process (ChatGPT.app or CLI) holds open, i.e. where the thread is loaded now.
+fn codex_open_threads() -> Result<Vec<String>, String> {
+    let output = Command::new("lsof")
+        .args(["-w", "-a", "-c", "codex", "-Fn"])
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .map_err(|error| format!("session: lsof: {error}"))?;
+
+    // lsof exits 1 when no codex process holds a file; that is an empty answer, not a failure.
+    if !output.status.success() && !output.stdout.is_empty() {
+        return Err(format!("session: lsof: {}", output.status));
+    }
+
+    let mut ids: Vec<String> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| line.strip_prefix('n'))
+        .filter(|path| path.contains("/rollout-"))
+        .filter_map(|path| path.strip_suffix(".jsonl"))
+        .filter_map(|stem| stem.get(stem.len().saturating_sub(36)..))
+        .filter(|id| is_full_id(Provider::Codex, id))
+        .map(str::to_string)
+        .collect();
+    ids.sort();
+    ids.dedup();
+
+    Ok(ids)
 }
 
 /// Reports whether an ID has the provider's full native form, usable without its store.
@@ -398,11 +492,13 @@ pub(crate) fn resolve_provider(home: &Path, id: &str) -> Result<Provider, String
         return Ok(Provider::OpenCode);
     }
     let claude = find_claude_socket(home, id)?.is_some();
-    let codex = match codex_loaded(home) {
-        Ok(loaded) => loaded.iter().any(|loaded| loaded == id),
-        Err(_) if claude => false,
-        Err(error) => return Err(error),
-    };
+    let open = codex_open_threads().is_ok_and(|ids| ids.iter().any(|open| open == id));
+    let codex = open
+        || match codex_loaded(home) {
+            Ok(loaded) => loaded.iter().any(|loaded| loaded == id),
+            Err(_) if claude => false,
+            Err(error) => return Err(error),
+        };
 
     match (claude, codex) {
         (true, false) => Ok(Provider::Claude),
@@ -412,7 +508,7 @@ pub(crate) fn resolve_provider(home: &Path, id: &str) -> Result<Provider, String
     }
 }
 
-/// Lists unambiguous active IDs from Claude sockets, loaded Codex threads and running OpenCode sessions, excluding historical stores.
+/// Lists unambiguous active IDs from Claude sockets, Codex threads loaded by any codex process (control socket or open rollout), and running OpenCode sessions.
 pub(crate) fn active(home: &Path) -> (Vec<Author>, Vec<String>) {
     let mut errors = Vec::new();
     let mut active: Vec<Author> = claude_agents(home)
@@ -455,6 +551,25 @@ pub(crate) fn active(home: &Path) -> (Vec<Author>, Vec<String>) {
                 Author { id, name }
             }),
     );
+
+    let open: Vec<Author> = codex_open_threads()
+        .unwrap_or_else(|error| {
+            errors.push(error);
+            Vec::new()
+        })
+        .into_iter()
+        .filter(|id| !active.iter().any(|author| &author.id == id))
+        .map(|id| {
+            let name = known
+                .iter()
+                .find(|session| session.id == id)
+                .map(|session| session.name.clone())
+                .unwrap_or_default();
+            Author { id, name }
+        })
+        .collect();
+    active.extend(open);
+
     active.retain(|author| is_full_id(Provider::Claude, &author.id));
     active.extend(crate::opencode::active(home).unwrap_or_else(|error| {
         errors.push(error);
