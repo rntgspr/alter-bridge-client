@@ -105,14 +105,34 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
     Ok(())
 }
 
-/// Appends the trusted-peers and rule lines when the actor has unexpired trusted peers.
+/// Appends the trusted-peers and rule lines when the actor has unexpired trusted peers, and the closing-window line.
 fn push_trusted(home: &Path, actor: &str, context: &mut String) {
+    let now = trust::now();
+
+    let closing = trust::closing(home, actor);
+    if !closing.is_empty() {
+        let listed = closing
+            .iter()
+            .map(|peer| {
+                let hours = peer.expires_at.saturating_sub(now).div_ceil(3600);
+                let name = peer
+                    .name
+                    .as_deref()
+                    .unwrap_or(crate::address::alias(&peer.peer));
+                format!("#{name} ({}, {hours}h left)", peer.peer)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        context.push_str("\nalter-bridge expired trust closing: ");
+        context.push_str(&listed);
+        context.push_str("\nalter-bridge rule: tell the user once that these expired trusts can still be renewed with a bare `abg-trust`.");
+    }
+
     let peers = trust::active(home, actor);
     if peers.is_empty() {
         return;
     }
 
-    let now = trust::now();
     let listed = peers
         .iter()
         .map(|peer| {

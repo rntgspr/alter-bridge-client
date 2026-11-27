@@ -13,6 +13,7 @@ use crate::Exit;
 
 const TRUST_NAME: &str = "alter-bridge-trust.json";
 const TTL_SECS: u64 = 86_400;
+const RETAIN_SECS: u64 = 7 * 86_400;
 const USAGE: &str = "usage: alter-bridge trust grant --id <self> --peer <id> [--name <name>]\n       alter-bridge trust revoke --id <self> --peer <id>\n       alter-bridge trust list --id <self>\n";
 
 /// One trusted peer of an actor, as exposed to the hook and the list command.
@@ -73,10 +74,12 @@ fn load(home: &Path) -> Result<Store, String> {
     serde_json::from_str(&text).map_err(|_| "trust: invalid trust store".to_string())
 }
 
-/// Prunes expired entries and writes the store atomically with mode 600.
+/// Prunes entries past the renewal window and writes the store atomically with mode 600.
 fn save(home: &Path, mut store: Store) -> Result<(), String> {
     let at = now();
-    store.entries.retain(|entry| entry.expires_at > at);
+    store
+        .entries
+        .retain(|entry| entry.expires_at + RETAIN_SECS > at);
 
     let dir = home.join(".config");
     match std::fs::DirBuilder::new().mode(0o700).create(&dir) {
@@ -126,6 +129,50 @@ pub(crate) fn active(home: &Path, actor: &str) -> Vec<Peer> {
                 .collect()
         })
         .unwrap_or_default()
+}
+
+/// Returns an actor's expired peers whose renewal window closes within one day, with that close time.
+pub(crate) fn closing(home: &Path, actor: &str) -> Vec<Peer> {
+    let at = now();
+
+    load(home)
+        .map(|store| {
+            store
+                .entries
+                .into_iter()
+                .filter(|entry| entry.actor == actor && entry.expires_at <= at)
+                .map(|entry| Peer {
+                    peer: entry.peer,
+                    name: entry.name,
+                    expires_at: entry.expires_at + RETAIN_SECS,
+                })
+                .filter(|peer| peer.expires_at > at && peer.expires_at <= at + TTL_SECS)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Renews an actor's expired entries still inside the renewal window and returns them.
+fn renew_expired(home: &Path, actor: &str) -> Result<Vec<Peer>, String> {
+    let mut store = load(home)?;
+    let at = now();
+    let mut renewed = Vec::new();
+    for entry in &mut store.entries {
+        if entry.actor == actor && entry.expires_at <= at && entry.expires_at + RETAIN_SECS > at {
+            entry.expires_at = at + TTL_SECS;
+            renewed.push(Peer {
+                peer: entry.peer.clone(),
+                name: entry.name.clone(),
+                expires_at: entry.expires_at,
+            });
+        }
+    }
+
+    if !renewed.is_empty() {
+        save(home, store)?;
+    }
+
+    Ok(renewed)
 }
 
 /// Removes every trust entry owned by an actor.
@@ -212,7 +259,11 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
             );
         }
         "list" => {
-            println!("{}", serde_json::json!({"peers": active(home, id)}));
+            let renewed = renew_expired(home, id).map_err(Exit::Failure)?;
+            println!(
+                "{}",
+                serde_json::json!({"peers": active(home, id), "renewed": renewed})
+            );
         }
         _ => return Err(Exit::Usage(USAGE.into())),
     }
