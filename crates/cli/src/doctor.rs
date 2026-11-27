@@ -12,7 +12,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use toml_edit::DocumentMut;
 
-use crate::{Exit, api, config, daemon, setup};
+use crate::{api, config, daemon, setup, Exit};
 
 const MAX_PROVIDER_BYTES: u64 = 1024 * 1024;
 const PROBE_BUDGET: Duration = Duration::from_secs(4);
@@ -358,6 +358,44 @@ fn inspect_provider(
                 *attention = true;
                 finding("attention", &label, "missing or unreadable", repair);
             }
+        }
+    }
+    let skills_dir = skill_root.join("skills");
+    let obsolete: Vec<_> = setup_record
+        .and_then(|record| record.get("files"))
+        .and_then(Value::as_object)
+        .into_iter()
+        .flat_map(|files| files.keys())
+        .map(PathBuf::from)
+        .filter(|path| {
+            path.starts_with(&skills_dir) && !skill_paths.contains(path) && path.exists()
+        })
+        .collect();
+    let backups: Vec<_> = std::fs::read_dir(&skills_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|skill| std::fs::read_dir(skill.path()).ok())
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.contains(".alter-bridge-backup-"))
+        })
+        .collect();
+    for (paths, detail, next) in [
+        (&obsolete, "owned skill file no longer shipped", repair),
+        (
+            &backups,
+            "leftover setup backup",
+            "remove the backup file by hand",
+        ),
+    ] {
+        for path in paths {
+            *attention = true;
+            finding("attention", &path.display().to_string(), detail, next);
         }
     }
     let label = format!("{provider} setup metadata");

@@ -11,12 +11,12 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use toml_edit::{DocumentMut, Item, Table, value};
+use toml_edit::{value, DocumentMut, Item, Table};
 use ureq::tls::{RootCerts, TlsConfig, TlsProvider};
 
-use crate::{Exit, config};
+use crate::{config, Exit};
 
 const OWNER: &str = "rntgspr/alter-bridge-client";
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -499,26 +499,28 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
         });
     }
     let mut obsolete_commands = Vec::new();
-    if provider == "claude" {
-        if let Some(files) = recorded {
-            for (path, expected) in files {
-                let path = PathBuf::from(path);
-                if path.parent() != Some(claude_root.join("commands").as_path())
-                    || path.extension().is_none_or(|extension| extension != "md")
-                {
-                    continue;
-                }
-                let Some(bytes) = read_existing(&path).map_err(Exit::Failure)? else {
-                    continue;
-                };
-                if expected.as_str() != Some(digest(&bytes).as_str()) {
-                    return Err(Exit::Failure(format!(
-                        "{} has modified owned content; refusing removal",
-                        path.display()
-                    )));
-                }
-                obsolete_commands.push((path, bytes));
+    let mut kept_modified = Vec::new();
+    let skills_dir = skill_root.join("skills");
+    if let Some(files) = recorded {
+        for (path, expected) in files {
+            let path = PathBuf::from(path);
+            if changes.iter().any(|change| change.path == path) {
+                continue;
             }
+            let command = provider == "claude"
+                && path.parent() == Some(claude_root.join("commands").as_path())
+                && path.extension().is_some_and(|extension| extension == "md");
+            if !command && !path.starts_with(&skills_dir) {
+                continue;
+            }
+            let Some(bytes) = read_existing(&path).map_err(Exit::Failure)? else {
+                continue;
+            };
+            if expected.as_str() != Some(digest(&bytes).as_str()) {
+                kept_modified.push(path);
+                continue;
+            }
+            obsolete_commands.push((path, bytes));
         }
     }
     let mut transaction = config::Transaction::open(home).map_err(Exit::Failure)?;
@@ -570,23 +572,38 @@ pub(crate) fn run(args: &[String], home: &Path) -> Result<(), Exit> {
     let mut changed = Vec::new();
     for change in &changes {
         if change.previous.as_deref() != Some(&change.next) {
-            write_guarded(change).map_err(|error| {
+            let backup = write_guarded(change).map_err(|error| {
                 Exit::Failure(format!(
                     "partial setup; changed {} before failure at {}: {error}",
                     changed.join(", "),
                     change.path.display()
                 ))
             })?;
+            if let Some(backup) = backup.filter(|_| change.path.starts_with(&skills_dir)) {
+                fs::remove_file(backup).ok();
+            }
             changed.push(change.path.display().to_string());
         }
     }
     for (path, _) in &obsolete_commands {
         fs::remove_file(path).map_err(|_| {
             Exit::Failure(format!(
-                "partial setup; cannot remove owned obsolete command {}",
+                "partial setup; cannot remove owned obsolete file {}",
                 path.display()
             ))
         })?;
+        if let Some(parent) = path
+            .parent()
+            .filter(|parent| parent.starts_with(&skills_dir))
+        {
+            fs::remove_dir(parent).ok();
+        }
+    }
+    for path in &kept_modified {
+        eprintln!(
+            "kept {}: no longer shipped, but has modified content",
+            path.display()
+        );
     }
     transaction.file.setup = Some(setup);
     transaction.save().map_err(|error| {
@@ -1345,8 +1362,8 @@ fn merge_codex_mcp(
     Ok(doc.to_string().into_bytes())
 }
 
-/// Writes one guarded provider file with a private temporary, backup and atomic rename.
-fn write_guarded(change: &Change) -> Result<(), String> {
+/// Writes one guarded provider file with a private temporary, backup and atomic rename; returns the backup path.
+fn write_guarded(change: &Change) -> Result<Option<PathBuf>, String> {
     let parent = change
         .path
         .parent()
@@ -1358,6 +1375,7 @@ fn write_guarded(change: &Change) -> Result<(), String> {
         return Err("destination changed during setup".into());
     }
     let mode = 0o600;
+    let mut backup_path = None;
     if let Some(old) = &change.previous {
         let backup = change
             .path
@@ -1374,6 +1392,7 @@ fn write_guarded(change: &Change) -> Result<(), String> {
         file.write_all(old)
             .and_then(|()| file.sync_all())
             .map_err(|_| "cannot persist backup".to_string())?;
+        backup_path = Some(backup);
     }
     let temporary = change
         .path
@@ -1403,5 +1422,5 @@ fn write_guarded(change: &Change) -> Result<(), String> {
     fs::File::open(parent)
         .and_then(|directory| directory.sync_all())
         .map_err(|_| "provider file replaced, but directory sync failed".to_string())?;
-    Ok(())
+    Ok(backup_path)
 }
