@@ -43,17 +43,27 @@ struct Change {
     next: Vec<u8>,
 }
 
-/// Returns the Homebrew `<prefix>/bin/alter-bridge` above a Cellar keg when it resolves to the running CLI.
+/// Returns the stable `alter-bridge` path that resolves to the running CLI: the Homebrew
+/// `<prefix>/bin/alter-bridge` above a Cellar keg, otherwise the first `PATH` entry linked to it
+/// (a development symlink to a build output survives rebuilds).
 pub(crate) fn stable_bin() -> Option<PathBuf> {
     let running = std::env::current_exe().and_then(fs::canonicalize).ok()?;
 
     // Cellar layout: <prefix>/Cellar/alter-bridge/<version>/bin/alter-bridge
-    running
+    let cellar = running
         .ancestors()
         .nth(5)
         .filter(|_| running.ancestors().nth(4).and_then(Path::file_name) == Some("Cellar".as_ref()))
         .map(|prefix| prefix.join("bin/alter-bridge"))
-        .filter(|path| fs::canonicalize(path).ok().as_ref() == Some(&running))
+        .filter(|path| fs::canonicalize(path).ok().as_ref() == Some(&running));
+    if cellar.is_some() {
+        return cellar;
+    }
+
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .filter(|dir| dir.is_absolute())
+        .map(|dir| dir.join("alter-bridge"))
+        .find(|path| path != &running && fs::canonicalize(path).ok().as_ref() == Some(&running))
 }
 
 /// Returns the real package root bundled beside a Homebrew install, when present.
